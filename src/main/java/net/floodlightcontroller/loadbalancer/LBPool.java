@@ -56,7 +56,7 @@ public class LBPool {
     protected static int LEAST_CONNECTION = 2;
     protected static int LEAST_RESPONSE_TIME = 3;
     protected static int CPU_USAGE = 4;
-    protected static short INTEGRATION = 5;
+    protected static int INTEGRATION = 5;
     
     
     public LBPool() {
@@ -65,7 +65,7 @@ public class LBPool {
         tenantId = null;
         netId = null;
         lbMethod = 3;//defualt 0
-        lbMode = 1;//0:NAT; 1:DR; 2:TUNNEL
+        lbMode = 0;//0:NAT; 1:DR; 2:TUNNEL
         protocol = 0;
         members = new ArrayList<String>();
         monitors = new ArrayList<String>();
@@ -83,7 +83,6 @@ public class LBPool {
     	this.lbMethod = method;
     }
     public LBMember pickMember(IPClient client, HashMap<String, LBMember> LBmembers) {
-        // simple round robin for now; add different lbmethod later
         if (members.size() > 0) {
         	if(lbMethod == RANDOM){
         		Random r = new Random();

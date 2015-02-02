@@ -137,7 +137,7 @@ public class LoadBalancer implements IFloodlightModule,
     protected static short CPU_USAGE= 4;
     protected static short INTEGRATION = 5;
     
-    protected static short MAT = 0;
+    protected static short NAT = 0;
     protected static short DR = 1;
     protected static short TUNNEL = 2;
     
@@ -265,11 +265,13 @@ public class LoadBalancer implements IFloodlightModule,
                     }
                     
                     LBMember member = pool.pickMember(client, thePoolMembers);//choose the Algorithm
+                   
                     
                     // for chosen member, check device manager and find and push routes, in both directions   
                     
-                    if(pool.lbMode == MAT)pushBidirectionalVipRoutes(sw, pi, cntx, client, member);
-                    if(pool.lbMode == DR)pushBidirectionalDirectRoutes(sw, pi, cntx, client, member);
+                    pushBidirectionalVipRoutes(sw, pi, cntx, client, member);
+//                    if(pool.lbMode == NAT)pushBidirectionalVipRoutes(sw, pi, cntx, client, member);
+//                    if(pool.lbMode == DR)pushBidirectionalDirectRoutes(sw, pi, cntx, client, member);
                    
                     // packet out based on table rule
                     pushPacket(pkt, sw, pi.getBufferId(), pi.getInPort(), OFPort.OFPP_TABLE.getValue(),
@@ -495,7 +497,7 @@ public class LoadBalancer implements IFloodlightModule,
         if (srcDevice == null || dstDevice == null) {System.out.println("can't find the device");
         	return;
         	}
-        
+        System.out.println("have gone into the pudhdirectroute and have found the device");
         Long srcIsland = topology.getL2DomainId(sw.getId());
 
         if (srcIsland == null) {
@@ -580,14 +582,12 @@ public class LoadBalancer implements IFloodlightModule,
                     // out: match dest client (ip, port), rewrite src from member ip/port to vip ip/port, forward
                     
                     if (routeIn != null) {
+                    	System.out.println("have gone into routeIn");
                         pushStaticVipRoute(true, routeIn, client, member, sw.getId());
-                        //pushDirectRoute(true, routeIn, client, member, sw.getId());
-                        
                     }
                     
                     if (routeOut != null) {
                         pushStaticVipRoute(false, routeOut, client, member, sw.getId());
-                        //pushDirectRoute(false, routeIn, client, member, sw.getId());
                     }
 
                 }
@@ -715,13 +715,13 @@ public class LoadBalancer implements IFloodlightModule,
                     // out: match dest client (ip, port), rewrite src from member ip/port to vip ip/port, forward
                     
                     if (routeIn != null) {
-                        
+                    	
                         pushDirectRoute(true, routeIn, client, member, sw.getId());
                         
                     }
                     
                     if (routeOut != null) {
-                        
+                    	
                         pushDirectRoute(false, routeOut, client, member, sw.getId());
                     }
 
@@ -768,12 +768,13 @@ public class LoadBalancer implements IFloodlightModule,
                fm.setOutPort(OFPort.OFPP_NONE.getValue());
                fm.setCookie((long) 0);  
                fm.setPriority(Short.MAX_VALUE);
+               System.out.println(vips.get(member.vipId).address);
                
                if (inBound) {
                    entryName = "inbound-vip-"+ member.vipId+"-client-"+client.ipAddress+"-port-"+client.targetPort
                            +"-srcswitch-"+path.get(0).getNodeId()+"-sw-"+sw;
                    matchString = "nw_src="+IPv4.fromIPv4Address(client.ipAddress)+","
-                		       + "nw_dst="+member.vipId+","
+                		       + "nw_dst="+IPv4.fromIPv4Address(vips.get(member.vipId).address)+","
                                + "nw_proto="+String.valueOf(client.nw_proto)+","
                                + "tp_src="+String.valueOf(client.srcPort & 0xffff)+","
                                + "dl_type="+LB_ETHER_TYPE+","

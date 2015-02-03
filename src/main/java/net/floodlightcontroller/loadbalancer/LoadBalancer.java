@@ -141,7 +141,7 @@ public class LoadBalancer implements IFloodlightModule,
     protected static short DR = 1;
     protected static short TUNNEL = 2;
     
-    protected static int STATUS_IP = IPv4.toIPv4Address("192.168.9.19");
+    protected static int STATUS_IP = IPv4.toIPv4Address("192.168.1.10");
     
     // Comparator for sorting by SwitchCluster
     public Comparator<SwitchPort> clusterIdComparator =
@@ -224,6 +224,10 @@ public class LoadBalancer implements IFloodlightModule,
                     vipProxyArpReply(sw, pi, cntx, vipId);
                     return Command.STOP;
                 }
+                if (targetProtocolAddress == STATUS_IP){
+                	 monitorArpReply(sw, pi, cntx);
+                     return Command.STOP;
+                }
             }
         } else {
             // currently only load balance IPv4 packets - no-op for other traffic 
@@ -269,9 +273,9 @@ public class LoadBalancer implements IFloodlightModule,
                     
                     // for chosen member, check device manager and find and push routes, in both directions   
                     
-                    pushBidirectionalVipRoutes(sw, pi, cntx, client, member);
-//                    if(pool.lbMode == NAT)pushBidirectionalVipRoutes(sw, pi, cntx, client, member);
-//                    if(pool.lbMode == DR)pushBidirectionalDirectRoutes(sw, pi, cntx, client, member);
+                    
+                    if(pool.lbMode == NAT)pushBidirectionalVipRoutes(sw, pi, cntx, client, member);
+                    if(pool.lbMode == DR)pushBidirectionalDirectRoutes(sw, pi, cntx, client, member);
                    
                     // packet out based on table rule
                     pushPacket(pkt, sw, pi.getBufferId(), pi.getInPort(), OFPort.OFPP_TABLE.getValue(),
@@ -347,7 +351,10 @@ public class LoadBalancer implements IFloodlightModule,
     				members.get(id).cpuUsage = cpuUsage;
     				members.get(id).new_request_rt_impact = rtImpact;
     				members.get(id).new_request_cpu_impact = cpuImpact;
-
+                    
+    				System.out.println("get Server" + IPv4.fromIPv4Address(srcIP)
+    						+ " info, which responseTime is " + responseTime + ", Connection amount is " + 
+    						nConnections + " and cpuUsage is" + cpuUsage);
     				return;				
     			}			
     		}
@@ -398,6 +405,52 @@ public class LoadBalancer implements IFloodlightModule,
         return;
     }
 
+    
+    protected void monitorArpReply(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx) {
+        log.debug("vipProxyArpReply");
+            
+        Ethernet eth = IFloodlightProviderService.bcStore.get(cntx,
+                                                              IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
+
+        // retrieve original arp to determine host configured gw IP address                                          
+        if (! (eth.getPayload() instanceof ARP))
+            return;
+        ARP arpRequest = (ARP) eth.getPayload();
+        
+        // have to do proxy arp reply since at this point we cannot determine the requesting application type
+        byte[] vipProxyMacBytes = MACAddress.valueOf("12:34:56:78:90:12").toBytes();
+        System.out.println("vipProxyMacBytes:" + vipProxyMacBytes);
+        
+        // generate proxy ARP reply
+        IPacket arpReply = new Ethernet()
+            .setSourceMACAddress(vipProxyMacBytes)
+            .setDestinationMACAddress(eth.getSourceMACAddress())
+            .setEtherType(Ethernet.TYPE_ARP)
+            .setVlanID(eth.getVlanID())
+            .setPriorityCode(eth.getPriorityCode())
+            .setPayload(
+                new ARP()
+                .setHardwareType(ARP.HW_TYPE_ETHERNET)
+                .setProtocolType(ARP.PROTO_TYPE_IP)
+                .setHardwareAddressLength((byte) 6)
+                .setProtocolAddressLength((byte) 4)
+                .setOpCode(ARP.OP_REPLY)
+                .setSenderHardwareAddress(vipProxyMacBytes)
+                .setSenderProtocolAddress(
+                        arpRequest.getTargetProtocolAddress())
+                .setTargetHardwareAddress(
+                        eth.getSourceMACAddress())
+                .setTargetProtocolAddress(
+                        arpRequest.getSenderProtocolAddress()));
+                
+        // push ARP reply out
+        pushPacket(arpReply, sw, OFPacketOut.BUFFER_ID_NONE, OFPort.OFPP_NONE.getValue(),
+                   pi.getInPort(), cntx, true);
+       
+        
+        return;
+    }
+  
     /**
      * used to push any packet - borrowed routine from Forwarding
      * 
@@ -582,7 +635,7 @@ public class LoadBalancer implements IFloodlightModule,
                     // out: match dest client (ip, port), rewrite src from member ip/port to vip ip/port, forward
                     
                     if (routeIn != null) {
-                    	System.out.println("have gone into routeIn");
+                    	//System.out.println("have gone into routeIn");
                         pushStaticVipRoute(true, routeIn, client, member, sw.getId());
                     }
                     
@@ -768,7 +821,7 @@ public class LoadBalancer implements IFloodlightModule,
                fm.setOutPort(OFPort.OFPP_NONE.getValue());
                fm.setCookie((long) 0);  
                fm.setPriority(Short.MAX_VALUE);
-               System.out.println(vips.get(member.vipId).address);
+               
                
                if (inBound) {
                    entryName = "inbound-vip-"+ member.vipId+"-client-"+client.ipAddress+"-port-"+client.targetPort

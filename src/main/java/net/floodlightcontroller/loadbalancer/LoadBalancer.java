@@ -330,6 +330,7 @@ public class LoadBalancer implements IFloodlightModule,
     		long rt = Long.parseLong(serverStats[0]);
     		int nConnections = Integer.parseInt(serverStats[1]);
     		double cpuUsage = Double.parseDouble(serverStats[2]);
+    		double memUsage = Double.parseDouble(serverStats[3]);
 
     		long responseTime = TimeUnit.MILLISECONDS.toSeconds(rt);
 
@@ -349,12 +350,14 @@ public class LoadBalancer implements IFloodlightModule,
     				members.get(id).responseTime = responseTime;
     				members.get(id).nConnections = nConnections;
     				members.get(id).cpuUsage = cpuUsage;
+    				members.get(id).memUsage = memUsage;
     				members.get(id).new_request_rt_impact = rtImpact;
     				members.get(id).new_request_cpu_impact = cpuImpact;
                     
     				System.out.println("get Server" + IPv4.fromIPv4Address(srcIP)
-    						+ " info, which responseTime is " + responseTime + ", Connection amount is " + 
-    						nConnections + " and cpuUsage is" + cpuUsage);
+    						+ " info, which responseTime is " + responseTime + ", "
+    						+ "Connection amount is " + nConnections + " cpuUsage is " 
+    						+ cpuUsage + " memUsage is " + memUsage);
     				return;				
     			}			
     		}

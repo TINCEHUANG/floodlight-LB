@@ -35,6 +35,8 @@ public class LBMember {
     protected long responseTime;
     protected int nConnections;
     protected double cpuUsage;
+    protected double memUsage;
+    
     
     protected long new_request_rt_impact;
     public double new_request_cpu_impact;
@@ -55,6 +57,7 @@ public class LBMember {
         responseTime = 0;
         nConnections = 0;
         cpuUsage = 0;
+        memUsage = 0;
         new_request_rt_impact = 1;
         new_request_cpu_impact = 0.5;
         

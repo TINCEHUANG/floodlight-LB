@@ -269,7 +269,6 @@ public class LoadBalancer implements IFloodlightModule,
                     }
                     
                     LBMember member = pool.pickMember(client, thePoolMembers);//choose the Algorithm
-                   
                     
                     // for chosen member, check device manager and find and push routes, in both directions   
                     
@@ -316,6 +315,8 @@ public class LoadBalancer implements IFloodlightModule,
     	 	private void handleServerInfo(Data dataPkt, int srcIP) {
     		// TODO Auto-generated method stub
     		String info = null;
+    		int CAF = 2;//connection adjustment factor
+    		
 
 
     		try {
@@ -327,33 +328,49 @@ public class LoadBalancer implements IFloodlightModule,
 
     		String [] serverStats = info.split(" ");
 
-    		long rt = Long.parseLong(serverStats[0]);
+    		double rt = Double.parseDouble(serverStats[0]);
     		int nConnections = Integer.parseInt(serverStats[1]);
     		double cpuUsage = Double.parseDouble(serverStats[2]);
     		double memUsage = Double.parseDouble(serverStats[3]);
 
-    		long responseTime = TimeUnit.MILLISECONDS.toSeconds(rt);
-
+    		double responseTime = rt;
+    		Double load = cpuUsage * 0.6 + memUsage * 0.4;//compute server load
 
     		for(String id: members.keySet()){
     			if(members.get(id).address == srcIP){	
-
-    				long rtImpact = members.get(id).new_request_rt_impact;
+                    double lastLoad = members.get(id).cpuUsage * 0.6 + members.get(id).memUsage * 0.4;
+    				double rtImpact = members.get(id).new_request_rt_impact;
     				double cpuImpact = members.get(id).new_request_cpu_impact;
+    				double memImpact = members.get(id).new_request_memory_impact;
 
     				if(nConnections != 0 && responseTime != 0)
-    					rtImpact = (responseTime / nConnections);
+    					rtImpact = (responseTime / (nConnections + CAF ));
 
     				if(nConnections != 0 && cpuUsage > 1.0)
-    					cpuImpact = (cpuUsage / nConnections);
-
+    					cpuImpact = (cpuUsage / (nConnections + CAF ));
+    				
+    				if(nConnections != 0 && memUsage > 1.0)
+    					memImpact = (memUsage / (nConnections + CAF ));
+                     
     				members.get(id).responseTime = responseTime;
     				members.get(id).nConnections = nConnections;
     				members.get(id).cpuUsage = cpuUsage;
     				members.get(id).memUsage = memUsage;
     				members.get(id).new_request_rt_impact = rtImpact;
     				members.get(id).new_request_cpu_impact = cpuImpact;
+    				members.get(id).new_request_memory_impact = memImpact;
+    				members.get(id).isOutOfService = false;//refresh "Keepalived"
+    				members.get(id).unreportedCount = 0;//refresh "Keepalived"
+    				if(load < 90)members.get(id).isOverloaded = false;//decide overload
+                    else members.get(id).isOverloaded = true;
+    	            
+    				
+    				LBPool thisPool = pools.get(members.get(id).poolId);
+    				//Compute new weight for related dynamic feedback algorithm
+    				
+    				thisPool.adjustWeight(thisPool, members.get(id), lastLoad);
                     
+    				
     				System.out.println("get Server" + IPv4.fromIPv4Address(srcIP)
     						+ " info, which responseTime is " + responseTime + ", "
     						+ "Connection amount is " + nConnections + " cpuUsage is " 
@@ -553,7 +570,7 @@ public class LoadBalancer implements IFloodlightModule,
         if (srcDevice == null || dstDevice == null) {System.out.println("can't find the device");
         	return;
         	}
-        System.out.println("have gone into the pudhdirectroute and have found the device");
+        //System.out.println("have gone into the pudhdirectroute and have found the device");
         Long srcIsland = topology.getL2DomainId(sw.getId());
 
         if (srcIsland == null) {

@@ -57,6 +57,7 @@ public class LBPool {
     protected static int LEAST_RESPONSE_TIME = 3;
     protected static int CPU_USAGE = 4;
     protected static int INTEGRATION = 5;
+    protected static int WINTEGRATION = 6;
     
     
     public LBPool() {
@@ -116,24 +117,20 @@ public class LBPool {
 	 */
 	public LBMember responseTime(HashMap<String, LBMember> members){
 
-		long bestRT = Long.MAX_VALUE;
+		Double bestRT = Double.MAX_VALUE;
 		LBMember target = null;
 		String bestId = null;
 		
 		LinkedList<String> bestTargets = new LinkedList<String>();
 
 		for(String id : members.keySet()){
-
-
-
-			if( (members.get(id).responseTime + members.get(id).new_request_rt_impact) < bestRT){
-				
+			if(members.get(id).isOverloaded)continue;
+			if(members.get(id).isOutOfService)continue;
+			if( (members.get(id).responseTime + members.get(id).new_request_rt_impact) < bestRT){	
 				bestTargets.removeAll(bestTargets);
 				bestTargets.add(id);
-
 				bestRT = members.get(id).responseTime + members.get(id).new_request_rt_impact;
 				bestId = id;
-				
 			}else if( (members.get(id).responseTime + members.get(id).new_request_rt_impact) == bestRT)
 				bestTargets.add(id);
 			
@@ -153,7 +150,7 @@ public class LBPool {
 		}else
 			target = members.get(bestId);
 		System.out.print("Algorithm responseTime work!. Server " + IPv4.fromIPv4Address(members.get(target.id).address) 
-				+ " 's RT is" + members.get(target.id).responseTime + "\n");
+				+ " 's RT is " + String.format(".2f", members.get(target.id).responseTime) + "\n");
 			members.get(target.id).responseTime += members.get(target.id).new_request_rt_impact;
         
 		return target;
@@ -172,11 +169,8 @@ public class LBPool {
 		int best = Integer.MAX_VALUE;
 		String bestId = null;
 		for(String id : members.keySet()){
-
-			/*	if(members.get(id).address == IPv4.toIPv4Address("192.168.9.11"))
-				members.get(id).nConnections = 6;
-			 */
-
+			if(members.get(id).isOverloaded)continue;
+			if(members.get(id).isOutOfService)continue;
 			if(members.get(id).nConnections < best){
 				best = members.get(id).nConnections;
 				target = members.get(id);
@@ -203,7 +197,8 @@ public class LBPool {
 		String bestId = null;
 
 		for(String id : members.keySet()){
-
+			if(members.get(id).isOverloaded)continue;
+			if(members.get(id).isOutOfService)continue;
 			if((members.get(id).cpuUsage + members.get(id).new_request_cpu_impact) < best){
 				best = members.get(id).cpuUsage + members.get(id).new_request_cpu_impact;
 				target = members.get(id);
@@ -218,7 +213,105 @@ public class LBPool {
 		return target;
 	}
 
+	public LBMember integration(HashMap<String, LBMember> members){
+
+		LBMember target = null;
+
+		double best = Double.MAX_VALUE;
+		String bestId = null;
+
+		for(String id : members.keySet()){
+			if(members.get(id).isOverloaded)continue;
+			if(members.get(id).isOutOfService)continue;
+			//compute load = (CPU+impact)*0.6+(Memory+impact)*0.4
+			double load = (members.get(id).cpuUsage + members.get(id).new_request_cpu_impact)* 0.6 
+					+ (members.get(id).memUsage + members.get(id).new_request_memory_impact) * 0.4;
+			if(load < best){
+				best = load;
+				target = members.get(id);
+				bestId = id;
+			}
+		}
+		members.get(bestId).cpuUsage += members.get(bestId).new_request_cpu_impact;
+		members.get(bestId).memUsage += members.get(bestId).new_request_memory_impact;
+		
+		System.out.print("Algorithm Integration work!\n");
+		return target;
+	} 
+	
+    //weighted integration algorithm
+	public LBMember wIntegration(HashMap<String, LBMember> members){
+		
+		LBMember target = null;
+;
+		double bestLWQ = 0.0;//LWQ = load/weight
+		String bestId = null;
+
+		for(String id : members.keySet()){
+			if(members.get(id).isOverloaded)continue;
+			if(members.get(id).isOutOfService)continue;
+			//compute load = (CPU+impact)*0.6+(Memory+impact)*0.4
+			double load = (members.get(id).cpuUsage + members.get(id).new_request_cpu_impact)* 0.6 
+					+ (members.get(id).memUsage + members.get(id).new_request_memory_impact) * 0.4;
+			double weight = members.get(id).weight;
+			if(load/weight < bestLWQ){
+				bestLWQ = load/weight;
+				target = members.get(id);
+				bestId = id;
+			}
+		}
+		
+		members.get(bestId).cpuUsage += members.get(bestId).new_request_cpu_impact;
+		members.get(bestId).memUsage += members.get(bestId).new_request_memory_impact;
+		System.out.print("Algorithm wIntegration work!\n");
+		return target; 
+	}
+	
+public LBMember WLC(HashMap<String, LBMember> members){
+		
+		LBMember target = null;
+;
+		double bestLCQ = 0.0;//LCQ = connections/weight
+		String bestId = null;
+
+		for(String id : members.keySet()){
+			if(members.get(id).isOverloaded)continue;
+			if(members.get(id).isOutOfService)continue;
+
+			double weight = members.get(id).weight;
+			if(members.get(id).nConnections/weight < bestLCQ){
+				bestLCQ = members.get(id).nConnections/weight;
+				target = members.get(id);
+				bestId = id;
+			}
+		}
+		
+		members.get(bestId).cpuUsage += members.get(bestId).new_request_cpu_impact;
+		members.get(bestId).memUsage += members.get(bestId).new_request_memory_impact;
+		
+		System.out.print("Algorithm WLC work!\n");
+		return target; 
+	}
+	
+	public static void adjustWeight(LBPool pool, LBMember member, double lastLoad){
+		   double load = member.cpuUsage * 0.6 + member.memUsage * 0.4;
+		   double idleRate = 100 - load;
+		   double cv = 5;//Critical Value
+		   double AF = 5;//Adjustment Factor
+		   if(pool.lbMethod == WINTEGRATION || pool.lbMethod == 9){//9:weighted least connection){
+			   if(Math.abs(lastLoad - load) > cv)member.weight = (AF + idleRate) * member.processCapacity;
+		   }
+		   //The think of ¡°Impact¡± will lead to this ¡°ABS¡± get wrong
+//		   if(pool.lbMethod == 8 || pool.lbMethod == 9){//9:weighted least connection
+//			   if(Math.abs(lastLoad - load) > cv ){
+//				   if(member.weight - IF * (lastLoad - load) < 10){member.weight = 10;return;}
+//				   //if(IF * (lastLoad - load) + member.weight > 1000){member.weight = 1000;return;}
+//				   member.weight = member.weight - IF * (load - lastLoad) * member.processCapacity;
+//			   }
+//		   }
+		   
+	   }
 
 }
 
-
+   

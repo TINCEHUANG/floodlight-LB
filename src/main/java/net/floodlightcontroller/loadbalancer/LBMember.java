@@ -16,30 +16,37 @@
 
 package net.floodlightcontroller.loadbalancer;
 
+import net.floodlightcontroller.packet.IPv4;
+
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 /**
  * Data structure for Load Balancer based on
  * Quantum proposal http://wiki.openstack.org/LBaaS/CoreResourceModel/proposal 
  * 
- * @author KC Wang
+ * 
  */
 
 @JsonSerialize(using=LBMemberSerializer.class)
-public class LBMember {
+public class LBMember implements Runnable{
     protected String id;
     protected int address;
     protected short port;
     protected String macString;
     
-    protected long responseTime;
+    protected double responseTime;
     protected int nConnections;
     protected double cpuUsage;
     protected double memUsage;
-    
-    
-    protected long new_request_rt_impact;
-    public double new_request_cpu_impact;
+        
+    protected double new_request_rt_impact;
+    protected double new_request_cpu_impact;
+    protected double new_request_memory_impact;
+    protected double weight;
+    protected boolean isOverloaded;
+    protected boolean isOutOfService;
+    protected int unreportedCount;
+    protected double processCapacity;
     
     protected int connectionLimit;
     protected short adminState;
@@ -60,11 +67,34 @@ public class LBMember {
         memUsage = 0;
         new_request_rt_impact = 1;
         new_request_cpu_impact = 0.5;
+        new_request_memory_impact = 0.5;
+        isOverloaded = false;
+        isOutOfService = false;
+        unreportedCount = 0;
+        weight = 1;
+        processCapacity = 1.0;
         
         connectionLimit = 0;
         adminState = 0;
         status = 0;
         poolId = null;
         vipId = null;
+        Thread t = new Thread(this);
+        t.start();
+    }
+  //compute how long or how many times controller haven't receive this server's report
+    public void run(){
+    	while(true){
+    		if(unreportedCount > 10){isOutOfService = true;continue;}
+    		unreportedCount++;
+    		System.out.println("Server" + IPv4.fromIPv4Address(this.address) 
+    				+ "unreported count is" + unreportedCount);
+            try {
+				Thread.sleep(5000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    	}
     }
 }

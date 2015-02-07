@@ -58,6 +58,7 @@ public class LBPool {
     protected static int CPU_USAGE = 4;
     protected static int INTEGRATION = 5;
     protected static int WINTEGRATION = 6;
+    protected static int WLC = 7;
     
     
     public LBPool() {
@@ -263,14 +264,14 @@ public class LBPool {
 		
 		members.get(bestId).cpuUsage += members.get(bestId).new_request_cpu_impact;
 		members.get(bestId).memUsage += members.get(bestId).new_request_memory_impact;
-		System.out.print("Algorithm wIntegration work!\n");
+		System.out.println("Algorithm wIntegration work! Server" + 
+		IPv4.fromIPv4Address(members.get(target.id).address) + " has bestLWQ which is " + bestLWQ );
 		return target; 
 	}
 	
 public LBMember WLC(HashMap<String, LBMember> members){
 		
 		LBMember target = null;
-;
 		double bestLCQ = 0.0;//LCQ = connections/weight
 		String bestId = null;
 
@@ -289,17 +290,18 @@ public LBMember WLC(HashMap<String, LBMember> members){
 		members.get(bestId).cpuUsage += members.get(bestId).new_request_cpu_impact;
 		members.get(bestId).memUsage += members.get(bestId).new_request_memory_impact;
 		
-		System.out.print("Algorithm WLC work!\n");
+		System.out.print("Algorithm WLC work! \n");
 		return target; 
 	}
 	
-	public static void adjustWeight(LBPool pool, LBMember member, double lastLoad){
+	public void adjustWeight(LBPool pool, LBMember member, double lastLoad){
 		   double load = member.cpuUsage * 0.6 + member.memUsage * 0.4;
 		   double idleRate = 100 - load;
-		   double cv = 5;//Critical Value
+		   double CV = 5;//Critical Value
 		   double AF = 5;//Adjustment Factor
-		   if(pool.lbMethod == WINTEGRATION || pool.lbMethod == 9){//9:weighted least connection){
-			   if(Math.abs(lastLoad - load) > cv)member.weight = (AF + idleRate) * member.processCapacity;
+		   if(pool.lbMethod == WINTEGRATION || pool.lbMethod == WLC){//9:weighted least connection){
+			   if(Math.abs(lastLoad - load) > CV)member.weight = (AF + idleRate) * member.processCapacity;
+			   //member.weight = (AF + idleRate) * member.processCapacity - member.responseTime;//¿¼ÂÇÏìÓ¦Ê±¼ä
 		   }
 		   //The think of ¡°Impact¡± will lead to this ¡°ABS¡± get wrong
 //		   if(pool.lbMethod == 8 || pool.lbMethod == 9){//9:weighted least connection

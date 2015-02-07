@@ -1,18 +1,4 @@
-/**
- *    Copyright 2013, Big Switch Networks, Inc.
- *
- *    Licensed under the Apache License, Version 2.0 (the "License"); you may
- *    not use this file except in compliance with the License. You may obtain
- *    a copy of the License at
- *
- *         http://www.apache.org/licenses/LICENSE-2.0
- *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- *    License for the specific language governing permissions and limitations
- *    under the License.
- **/
+
 
 package net.floodlightcontroller.loadbalancer;
 
@@ -79,6 +65,7 @@ import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.packet.TCP;
 import net.floodlightcontroller.packet.UDP;
 import net.floodlightcontroller.restserver.IRestApiService;
+import net.floodlightcontroller.routing.IRoutingDecision;
 import net.floodlightcontroller.routing.IRoutingService;
 import net.floodlightcontroller.routing.Route;
 import net.floodlightcontroller.staticflowentry.IStaticFlowEntryPusherService;
@@ -181,7 +168,8 @@ public class LoadBalancer implements IFloodlightModule,
         return (type.equals(OFType.PACKET_IN) && 
                 (name.equals("topology") || 
                  name.equals("devicemanager") ||
-                 name.equals("virtualizer")));
+                 name.equals("virtualizer")) ||
+                 name.equals("firewall"));
     }
 
     @Override
@@ -194,7 +182,16 @@ public class LoadBalancer implements IFloodlightModule,
             receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
         switch (msg.getType()) {
             case PACKET_IN:
-                return processPacketIn(sw, (OFPacketIn)msg, cntx);
+            	IRoutingDecision decision = null;
+                if (cntx != null){
+                     decision =
+                             IRoutingDecision.rtStore.get(cntx,
+                                                          IRoutingDecision.CONTEXT_DECISION);
+                   if(decision.getRoutingAction() == IRoutingDecision.RoutingAction.DROP)
+                	   return Command.CONTINUE;
+                   else return processPacketIn(sw, (OFPacketIn)msg, cntx);
+                }
+                else return processPacketIn(sw, (OFPacketIn)msg, cntx);
             default:
                 break;
         }
@@ -367,8 +364,7 @@ public class LoadBalancer implements IFloodlightModule,
     				
     				LBPool thisPool = pools.get(members.get(id).poolId);
     				//Compute new weight for related dynamic feedback algorithm
-    				
-    				thisPool.adjustWeight(thisPool, members.get(id), lastLoad);
+    				if(thisPool.lbMethod > 5)thisPool.adjustWeight(thisPool, members.get(id), lastLoad);
                     
     				
     				System.out.println("get Server" + IPv4.fromIPv4Address(srcIP)

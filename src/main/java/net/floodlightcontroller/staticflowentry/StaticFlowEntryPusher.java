@@ -406,6 +406,7 @@ public class StaticFlowEntryPusher
                     // if they don't match delete the old flow
                     } else{
                         oldFlowMod.setCommand(OFFlowMod.OFPFC_DELETE_STRICT);
+                        //comment out above line can make sw have multiple Flow Entry
                         if (dpidOldFlowMod.equals(dpid)) {
                             outQueue.add(oldFlowMod);
                         } else {

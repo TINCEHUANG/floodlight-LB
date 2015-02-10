@@ -79,22 +79,32 @@ public class LBMember implements Runnable{
         status = 0;
         poolId = null;
         vipId = null;
+      //state monitor for related dynamic feedback algorithm
+        
         Thread t = new Thread(this);
         t.start();
     }
   //compute how long or how many times controller haven't receive this server's report
     public void run(){
     	while(true){
-    		if(unreportedCount > 10){isOutOfService = true;continue;}
+    		 try {
+ 				Thread.sleep(5000);
+ 			}catch (InterruptedException e) {
+ 				// TODO Auto-generated catch block
+ 				e.printStackTrace();
+ 			}
+    		if(unreportedCount >= 10 ){
+    			if(isOutOfService == false){
+    				System.out.println("Server" + IPv4.fromIPv4Address(this.address) + "break down");
+    			isOutOfService = true;
+    			}
+    			continue;
+    		}
+    		else{
     		unreportedCount++;
     		System.out.println("Server" + IPv4.fromIPv4Address(this.address) 
-    				+ "unreported count is" + unreportedCount);
-            try {
-				Thread.sleep(5000);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+    				+ "unreported count is" + unreportedCount);}
+           
     	}
     }
 }

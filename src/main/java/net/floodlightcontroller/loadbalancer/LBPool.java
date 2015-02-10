@@ -66,7 +66,7 @@ public class LBPool {
         name = null;
         tenantId = null;
         netId = null;
-        lbMethod = 3;//defualt 0
+        lbMethod = 0;//defualt 0
         lbMode = 0;//0:NAT; 1:DR; 2:TUNNEL
         protocol = 0;
         members = new ArrayList<String>();
@@ -104,6 +104,15 @@ public class LBPool {
             if(lbMethod == CPU_USAGE){
             	return cpuUsage(LBmembers);
             }
+            if(lbMethod == INTEGRATION){
+            	return integration(LBmembers);
+            }
+            if(lbMethod == WINTEGRATION){
+            	return wIntegration(LBmembers);
+            }
+            if(lbMethod == WLC){
+            	return WLC(LBmembers);
+            }
             previousMemberIndex = (previousMemberIndex + 1) % members.size();
             return LBmembers.get(members.get(previousMemberIndex));
         } else {
@@ -126,7 +135,7 @@ public class LBPool {
 
 		for(String id : members.keySet()){
 			if(members.get(id).isOverloaded)continue;
-			if(members.get(id).isOutOfService)continue;
+			//if(members.get(id).isOutOfService)continue;
 			if( (members.get(id).responseTime + members.get(id).new_request_rt_impact) < bestRT){	
 				bestTargets.removeAll(bestTargets);
 				bestTargets.add(id);
@@ -245,12 +254,12 @@ public class LBPool {
 		
 		LBMember target = null;
 ;
-		double bestLWQ = 0.0;//LWQ = load/weight
+		double bestLWQ = Double.MAX_VALUE;//LWQ = load/weight
 		String bestId = null;
 
 		for(String id : members.keySet()){
 			if(members.get(id).isOverloaded)continue;
-			if(members.get(id).isOutOfService)continue;
+			//if(members.get(id).isOutOfService)continue;
 			//compute load = (CPU+impact)*0.6+(Memory+impact)*0.4
 			double load = (members.get(id).cpuUsage + members.get(id).new_request_cpu_impact)* 0.6 
 					+ (members.get(id).memUsage + members.get(id).new_request_memory_impact) * 0.4;

@@ -168,8 +168,8 @@ public class LoadBalancer implements IFloodlightModule,
         return (type.equals(OFType.PACKET_IN) && 
                 (name.equals("topology") || 
                  name.equals("devicemanager") ||
-                 name.equals("virtualizer")) ||
-                 name.equals("firewall"));
+                 name.equals("virtualizer") ||
+                 name.equals("firewall")));
     }
 
     @Override
@@ -187,7 +187,7 @@ public class LoadBalancer implements IFloodlightModule,
                      decision =
                              IRoutingDecision.rtStore.get(cntx,
                                                           IRoutingDecision.CONTEXT_DECISION);
-                   if(decision.getRoutingAction() == IRoutingDecision.RoutingAction.DROP)
+                   if(decision != null && decision.getRoutingAction() == IRoutingDecision.RoutingAction.DROP)
                 	   return Command.CONTINUE;
                    else return processPacketIn(sw, (OFPacketIn)msg, cntx);
                 }
@@ -348,21 +348,20 @@ public class LoadBalancer implements IFloodlightModule,
     				
     				if(nConnections != 0 && memUsage > 1.0)
     					memImpact = (memUsage / (nConnections + CAF ));
-                     
+    				
     				members.get(id).responseTime = responseTime;
     				members.get(id).nConnections = nConnections;
     				members.get(id).cpuUsage = cpuUsage;
     				members.get(id).memUsage = memUsage;
     				members.get(id).new_request_rt_impact = rtImpact;
     				members.get(id).new_request_cpu_impact = cpuImpact;
-    				members.get(id).new_request_memory_impact = memImpact;
+    				members.get(id).new_request_memory_impact = memImpact;	
     				members.get(id).isOutOfService = false;//refresh "Keepalived"
     				members.get(id).unreportedCount = 0;//refresh "Keepalived"
     				if(load < 90)members.get(id).isOverloaded = false;//decide overload
                     else members.get(id).isOverloaded = true;
     	            
-    				
-    				LBPool thisPool = pools.get(members.get(id).poolId);
+    				LBPool thisPool = pools.get(members.get(id).poolId); 
     				//Compute new weight for related dynamic feedback algorithm
     				if(thisPool.lbMethod > 5)thisPool.adjustWeight(thisPool, members.get(id), lastLoad);
                     
@@ -435,7 +434,7 @@ public class LoadBalancer implements IFloodlightModule,
         
         // have to do proxy arp reply since at this point we cannot determine the requesting application type
         byte[] vipProxyMacBytes = MACAddress.valueOf("12:34:56:78:90:12").toBytes();
-        System.out.println("vipProxyMacBytes:" + vipProxyMacBytes);
+        //System.out.println("vipProxyMacBytes:" + vipProxyMacBytes);
         
         // generate proxy ARP reply
         IPacket arpReply = new Ethernet()
